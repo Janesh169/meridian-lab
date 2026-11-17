@@ -95,7 +95,7 @@ Setup:
 https://<your-github-username>.github.io/<repository-name>/
 ```
 
-For example, with username `your-name` and repository `meridian-lab`, it would be `https://your-name.github.io/meridian-lab/`. The game loads nothing from any other host. Everything (the service worker, manifest and icons) is under that same path.
+For this repository, that is **`https://janesh169.github.io/meridian-lab/`**. The game loads nothing from any other host. Everything (the service worker, manifest and icons) is under that same path.
 
 Note: the HTTPS copy and the `file://` copy keep **separate saves**. To move between them, use *Save backup* (export from one, import into the other).
 

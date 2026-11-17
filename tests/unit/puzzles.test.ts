@@ -91,3 +91,30 @@ describe('puzzles reward understanding', () => {
     expect(p.simulateToEnd(30)).toBe('fail');
   });
 });
+
+describe('story content is consistent', () => {
+  it('every story puzzle and codex reference exists, ids are unique, and segments end on a cliffhanger', async () => {
+    const { CHAPTERS } = await import('../../src/content/chapters');
+    const { codexEntry } = await import('../../src/content/codex');
+    const { UPGRADES } = await import('../../src/content/chapters');
+    const seen = new Set<string>();
+    for (const ch of CHAPTERS) {
+      for (const seg of ch.segments) {
+        expect(seen.has(seg.id), seg.id).toBe(false);
+        seen.add(seg.id);
+        expect(seg.nodes[seg.nodes.length - 1].t, seg.id).toBe('end');
+        for (const n of seg.nodes) {
+          if (n.t === 'puzzle') {
+            const def = allPuzzleDefs().find((d) => d.id === n.id);
+            expect(def, n.id).toBeTruthy();
+            expect(codexEntry(def!.codex), def!.codex).toBeTruthy();
+            expect(seen.has(n.id), 'puzzle used twice: ' + n.id).toBe(false);
+            seen.add(n.id);
+          }
+          if (n.t === 'reward') expect(UPGRADES.some((u) => u.id === n.upgrade), n.upgrade).toBe(true);
+        }
+      }
+    }
+    expect(CHAPTERS.map((c) => c.id)).toEqual(['ch1', 'ch2']);
+  });
+});

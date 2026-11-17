@@ -28,6 +28,8 @@ export interface Movable {
   radius?: number;
   aperture?: number;
   focal?: number;
+  /** Swappable lenses: control `${id}.f` picks the focal length (m) from these options. */
+  focals?: number[];
 }
 
 export interface LaserParams {
@@ -35,6 +37,8 @@ export interface LaserParams {
   source: { x: number; y: number; angle: number };
   /** Parallel rays offset perpendicular to the source direction (metres). Default [0]. */
   beams?: number[];
+  /** A point source: rays fan out at these angles (degrees) around the source direction. */
+  fan?: number[];
   fixed: OpticalElement[];
   movables: Movable[];
   target: { x1: number; y1: number; x2: number; y2: number };
@@ -57,6 +61,7 @@ class LaserPuzzle extends Puzzle<LaserParams> {
     for (const m of this.params.movables) {
       out.push({ kind: 'slider', id: `${m.id}.pos`, label: `${m.label}: position`, min: 0, max: 100, step: 0.5, fmt: (v) => `${v.toFixed(1)}%` });
       if (m.angle) out.push({ kind: 'slider', id: `${m.id}.ang`, label: `${m.label}: angle`, min: m.angle.min, max: m.angle.max, step: m.angle.step ?? 0.5, fmt: (v) => `${v.toFixed(1)}°` });
+      if (m.focals) out.push({ kind: 'choice', id: `${m.id}.f`, label: `${m.label}: lens`, options: m.focals.map((f) => ({ value: f, label: `f = ${f > 0 ? '+' : ''}${f} m` })) });
       if (m.materials) out.push({ kind: 'choice', id: `${m.id}.mat`, label: `${m.label}: material`, options: m.materials.map((mt, i) => ({ value: i, label: `${mt.label} (n = ${mt.n})` })) });
     }
     return out;
@@ -82,7 +87,7 @@ class LaserPuzzle extends Puzzle<LaserParams> {
           els.push({ kind: 'mirror', id: m.id, x, y, length: m.length ?? 1, angle: ang });
           break;
         case 'lens':
-          els.push({ kind: 'lens', id: m.id, x, y, angle: ang, height: m.length ?? 1, focal: m.focal ?? 1 });
+          els.push({ kind: 'lens', id: m.id, x, y, angle: ang, height: m.length ?? 1, focal: m.focals ? this.values[`${m.id}.f`] ?? m.focals[0] : m.focal ?? 1 });
           break;
         case 'curvedMirror':
           els.push({ kind: 'curvedMirror', id: m.id, x, y, angle: ang, radius: m.radius ?? 2, aperture: m.aperture ?? 1 });
@@ -103,6 +108,7 @@ class LaserPuzzle extends Puzzle<LaserParams> {
     const s = this.params.source;
     const a = s.angle * DEG;
     const dx = Math.cos(a), dy = Math.sin(a);
+    if (this.params.fan) return this.params.fan.map((g) => ({ x: s.x, y: s.y, dx: Math.cos(a + g * DEG), dy: Math.sin(a + g * DEG) }));
     return (this.params.beams ?? [0]).map((o) => ({ x: s.x - dy * o, y: s.y + dx * o, dx, dy }));
   }
 

@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { CHAPTERS, OUTLINE, UPGRADES } from '../../content/chapters';
+import { CHAPTERS, nextOutline, UPGRADES } from '../../content/chapters';
 import { codexEntry } from '../../content/codex';
 import { FAMILY, puzzleDef } from '../../puzzles';
 import {
@@ -107,10 +107,10 @@ function Hub(props: { c: Controller }) {
           </div>
         )}
 
-        {allDone && (
+        {allDone && nextOutline() && (
           <div class="card col">
-            <h3>Coming next: Chapter 2, “{OUTLINE[0].title}”</h3>
-            <p class="dim">{OUTLINE[0].summary}</p>
+            <h3>Coming next: Chapter {CHAPTERS.length + 1}, “{nextOutline()!.title}”</h3>
+            <p class="dim">{nextOutline()!.summary}</p>
             <p class="dim">Until then, the side experiments below are always available.</p>
           </div>
         )}

@@ -41,7 +41,7 @@ export function HomeScreen(props: { c: Controller }) {
         <div class="row" style={{ justifyContent: 'space-between' }}>
           <div>
             <h1>Meridian Lab</h1>
-            <p class="dim" style={{ margin: 0 }}>{CHAPTERS[0].title} · {s.progress.completedSegments.length} of {CHAPTERS.flatMap((ch) => ch.segments).length} sections restored</p>
+            <p class="dim" style={{ margin: 0 }}>{(CHAPTERS.find((ch) => ch.segments.some((sg) => sg.id === next?.id)) ?? CHAPTERS[CHAPTERS.length - 1]).title} · {s.progress.completedSegments.length} of {CHAPTERS.flatMap((ch) => ch.segments).length} sections restored</p>
           </div>
           <div class="row">
             <span class="pill">Today: {fmtMin(today?.studyMin ?? 0)}</span>

@@ -5,7 +5,7 @@ A story-driven physics lab adventure for **study breaks**, with a hard study loc
 You study, which earns break time and charges the lab's reactor. You take a break, restoring a half-abandoned research station by solving physics puzzles that are accurately simulated. When the break ends, the game **saves mid-puzzle, sounds an alarm, vibrates and locks itself** until you finish another study block.
 
 - 6 puzzle families: projectiles, laser routing (ray optics), particle steering (E/B fields), circuit repair, mechanisms (Newton's laws, friction, Atwood, collisions, torque), and oscillation sync (SHM, resonance)
-- Chapter 1, “Cold Start”: 5 segments, 15 story puzzles, plus 7 side experiments. Outline for Chapters 2–6 in `src/content/chapters/outline.ts`
+- Chapter 1, “Cold Start”, and Chapter 2, “Reserve Power”: 10 segments, 30 story puzzles, plus 7 side experiments. Outline for Chapters 3–6 in `src/content/chapters/outline.ts`
 - Touch only. Ships as **one self-contained `index.html`** that runs offline from `file://`
 - Optional GitHub Pages build with Wake Lock, notifications and Add to Home Screen
 
@@ -50,7 +50,7 @@ The e2e tests run the built file over `file://`, offline, on an emulated touch t
 | `tests/unit/machine.test.ts` | Earning rules and caps, every transition, reload, sleep (large time jumps), backward clock jump (tampering), two tabs sharing one timer, import → LOCKED, update-safe loading of old or partial saves, delayed loosening of rules, streaks |
 | `tests/unit/physics/physics.test.ts` | Range `u²sin2θ/g`, max height, minimum-speed launch, mirror reflection, lens `1/v − 1/u = 1/f`, concave mirror focus, Snell's law and slab shift, critical angle and TIR, prism minimum deviation, `r = mv/qB`, `T = 2πm/qB`, helix pitch, velocity selector `v = E/B`, series/parallel, Kirchhoff, Wheatstone balance, RC charging, incline plus friction, Atwood, collisions with restitution, torque, pendulum (small-angle and exact), spring–mass, driven resonance amplitude, string harmonics |
 | `tests/unit/puzzles.test.ts` | Every puzzle's known solution wins, its starting setting fails, its save round-trips, and some puzzles reward understanding (complementary angles, TIR needs n > √2, and so on) |
-| `tests/e2e/run.cjs` | Loads offline with no errors, no game while studying (even after a reload), lock within 1 s of the deadline with the puzzle saved, alarm with no extra tap, sleep, clock tampering, two tabs, export → wipe → import, **a full Chapter 1 playthrough by touch**, portrait layout |
+| `tests/e2e/run.cjs` | Loads offline with no errors, no game while studying (even after a reload), lock within 1 s of the deadline with the puzzle saved, alarm with no extra tap, sleep, clock tampering, two tabs, export → wipe → import, **a full Chapter 1 and 2 playthrough by touch**, portrait layout |
 
 ---
 

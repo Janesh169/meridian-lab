@@ -7,7 +7,11 @@ import { solve, stepTransient, type CapState, type Component, type Solution } fr
 import { C, type Draw, type View } from '../../render/draw';
 import { Puzzle, registerPuzzleType, type ControlSpec } from '../framework';
 
-type Num = number | { control: string } | { sum: string[] };
+/**
+ * A resistance: fixed, a control's value, a sum of controls, or one side of a
+ * slide wire (potentiometer): `frac` is a 0–100 % control, and `rest` takes the other side.
+ */
+type Num = number | { control: string } | { sum: string[] } | { wire: string; total: number; rest?: boolean };
 
 export interface CircuitPart {
   id: string;
@@ -61,6 +65,11 @@ class CircuitPuzzle extends Puzzle<CircuitParams> {
     if (v === undefined) return 0;
     if (typeof v === 'number') return v;
     if ('control' in v) return this.values[v.control] ?? 0;
+    if ('wire' in v) {
+      const f = Math.min(1, Math.max(0, (this.values[v.wire] ?? 0) / 100));
+      // Never exactly 0 Ω: a jockey at the very end still touches a little wire.
+      return Math.max(1e-4, v.total * (v.rest ? 1 - f : f));
+    }
     return v.sum.reduce((a, id) => a + (this.values[id] ?? 0), 0);
   }
 
@@ -155,8 +164,8 @@ class CircuitPuzzle extends Puzzle<CircuitParams> {
       const I = sol.current[g.kind === 'capThreshold' ? '' : g.part] ?? 0;
       if (g.kind === 'current') {
         const a = Math.abs(I);
-        if (a < g.min) return this.finish(false, `${g.label}: ${a.toFixed(2)} A is too low (needs ${g.min}–${g.max} A).`);
-        if (a > g.max) return this.finish(false, `${g.label}: ${a.toFixed(2)} A is too high (needs ${g.min}–${g.max} A).`);
+        if (a < g.min) return this.finish(false, `${g.label}: ${amp(a)} is too low (needs ${ampRange(g.min, g.max)}).`);
+        if (a > g.max) return this.finish(false, `${g.label}: ${amp(a)} is too high (needs ${ampRange(g.min, g.max)}).`);
       } else if (g.kind === 'balanced') {
         if (Math.abs(I) > g.max) return this.finish(false, `${part.label} still reads ${(I * 1e6).toFixed(0)} µA. The bridge isn't balanced.`);
       } else if (g.kind === 'notCharging') {
@@ -206,7 +215,7 @@ class CircuitPuzzle extends Puzzle<CircuitParams> {
     // Goals panel (top-left)
     let y = P.view.y + P.view.h - 0.1;
     for (const g of P.goals) {
-      const label = g.kind === 'current' ? `${g.label}: ${g.min}–${g.max} A` : g.kind === 'balanced' ? `${P.parts.find((q) => q.id === g.part)!.label}: zero deflection` : g.kind === 'notCharging' ? `${P.parts.find((q) => q.id === g.part)!.label}: must not be charged backwards` : `${g.label}: open between ${g.tMin}–${g.tMax} s`;
+      const label = g.kind === 'current' ? `${g.label}: ${ampRange(g.min, g.max)}` : g.kind === 'balanced' ? `${P.parts.find((q) => q.id === g.part)!.label}: zero deflection` : g.kind === 'notCharging' ? `${P.parts.find((q) => q.id === g.part)!.label}: must not be charged backwards` : `${g.label}: open between ${g.tMin}–${g.tMax} s`;
       d.text(P.view.x + 0.1, y, '◇ ' + label, 13, C.dim, 'left', 'top');
       y -= 26 / d.cam.scale;
     }
@@ -249,7 +258,7 @@ function drawPart(d: Draw, pz: CircuitPuzzle, p: CircuitPart, a: { x: number; y:
       d.line(pa.x - nx * 0.32, pa.y - ny * 0.32, pa.x + nx * 0.32, pa.y + ny * 0.32, C.amber, 4);
       d.line(pb.x - nx * 0.16, pb.y - ny * 0.16, pb.x + nx * 0.16, pb.y + ny * 0.16, C.amber, 7);
       d.text(pa.x + ux * 0.14 + nx * 0.3, pa.y + uy * 0.14 + ny * 0.3, '+', 16, C.amber);
-      label(`${p.label} ${p.volts} V${p.r ? `, r = ${p.r} Ω` : ''}`, C.amber);
+      label(`${p.label} ${p.hidden ? '? V' : `${p.volts} V`}${p.r ? `, r = ${p.r} Ω` : ''}`, C.amber);
       if (sol) side(-1, amps, I < -0.01 ? C.red : C.cyan, 12);
       break;
     }
@@ -302,15 +311,19 @@ function drawPart(d: Draw, pz: CircuitPuzzle, p: CircuitPart, a: { x: number; y:
     case 'galvanometer': {
       lead();
       d.circleW(mx, my, s * 0.8, '#c9d6e3', 'rgba(7,11,18,0.9)', 2.5);
-      // needle: ±90° full scale at ±200 µA (log-ish for visibility)
+      // A rated meter reads linearly to its full scale; a null detector reads log-ish around zero.
+      const meter = !!p.rating;
       const uA = I * 1e6;
-      const defl = Math.sign(uA) * Math.min(1, Math.log10(1 + Math.abs(uA)) / Math.log10(1 + 2000)) * 1.2;
+      const defl = meter
+        ? Math.min(1.2, Math.abs(I) / p.rating!) * 1.2 - 0.6
+        : Math.sign(uA) * Math.min(1, Math.log10(1 + Math.abs(uA)) / Math.log10(1 + 2000)) * 1.2;
       const wob = sol && Math.abs(uA) > 1 ? Math.sin(t * 25) * 0.02 : 0;
       const ang = Math.PI / 2 - defl - wob;
-      d.line(mx, my - s * 0.4, mx + Math.cos(ang) * s * 0.75, my - s * 0.4 + Math.sin(ang) * s * 0.75, Math.abs(uA) < 20 ? C.green : C.red, 2);
-      d.text(mx, my - s * 0.15, 'G', 13, C.dim);
+      const good = meter ? Math.abs(I) <= p.rating! : Math.abs(uA) < 20;
+      d.line(mx, my - s * 0.4, mx + Math.cos(ang) * s * 0.75, my - s * 0.4 + Math.sin(ang) * s * 0.75, good ? C.green : C.red, 2);
+      d.text(mx, my - s * 0.15, meter ? 'mA' : 'G', 13, C.dim);
       label(`${p.label}`);
-      if (sol) side(-1, `${uA.toFixed(1)} µA`, Math.abs(uA) < 20 ? C.green : C.red);
+      if (sol) side(-1, meter ? `${(Math.abs(I) * 1000).toFixed(3)} mA` : `${uA.toFixed(1)} µA`, good ? (meter ? C.cyan : C.green) : C.red);
       break;
     }
     case 'switch': {
@@ -332,6 +345,13 @@ function drawPart(d: Draw, pz: CircuitPuzzle, p: CircuitPart, a: { x: number; y:
       break;
     }
   }
+}
+
+function amp(a: number): string {
+  return a < 0.1 ? `${(a * 1000).toFixed(2)} mA` : `${a.toFixed(2)} A`;
+}
+function ampRange(lo: number, hi: number): string {
+  return hi < 0.1 ? `${+(lo * 1000).toFixed(3)}–${+(hi * 1000).toFixed(3)} mA` : `${lo}–${hi} A`;
 }
 
 function mix(h: number): string {

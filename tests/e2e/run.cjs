@@ -247,11 +247,11 @@ async function storyToExperiment(page) {
     assert(saved.energyEarned >= 160, 'stats and energy restored');
   });
 
-  await test('Chapter 1 is playable start to finish (touch, test build)', async (b) => {
+  await test('Chapters 1 and 2 are playable start to finish (touch, test build)', async (b) => {
     const ctx = await tablet(b);
     const page = await open(ctx, TEST);
     // Plenty of study: 6 study blocks give 6 breaks, which is enough energy for every segment.
-    const segs = ['ch1.s1', 'ch1.s2', 'ch1.s3', 'ch1.s4', 'ch1.s5'];
+    const segs = ['ch1.s1', 'ch1.s2', 'ch1.s3', 'ch1.s4', 'ch1.s5', 'ch2.s1', 'ch2.s2', 'ch2.s3', 'ch2.s4', 'ch2.s5'];
     let solved = 0;
     for (const seg of segs) {
       if (await page.locator('[data-testid=lock-screen]').count()) {
@@ -288,9 +288,9 @@ async function storyToExperiment(page) {
       await page.waitForSelector('[data-testid=lock-screen]');
     }
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('meridianlab.save')));
-    assert(saved.progress.completedSegments.length === 5, 'all 5 segments complete: ' + saved.progress.completedSegments);
-    assert(solved === 15, 'solved 15 story puzzles, got ' + solved);
-    assert(saved.progress.codex.length >= 12, 'codex entries unlocked');
+    assert(saved.progress.completedSegments.length === 10, 'all 10 segments complete: ' + saved.progress.completedSegments);
+    assert(solved === 30, 'solved 30 story puzzles, got ' + solved);
+    assert(saved.progress.codex.length >= 25, 'codex entries unlocked');
     assert(page.errors.length === 0, 'errors: ' + page.errors.join('; '));
   });
 

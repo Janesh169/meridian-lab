@@ -3,9 +3,10 @@
 import type { Chapter, Upgrade } from '../../story/types';
 import { CH1 } from './ch1';
 import { CH2 } from './ch2';
+import { CH3 } from './ch3';
 import { OUTLINE } from './outline';
 
-export const CHAPTERS: Chapter[] = [CH1, CH2];
+export const CHAPTERS: Chapter[] = [CH1, CH2, CH3];
 export { OUTLINE };
 
 export const UPGRADES: Upgrade[] = [
@@ -19,6 +20,11 @@ export const UPGRADES: Upgrade[] = [
   { id: 'grid-map', label: 'Grid map', description: 'A live map of every load in the station.' },
   { id: 'probe', label: 'Branch probe', description: 'MOSS can listen to the hidden circuit.' },
   { id: 'shaft-lights', label: 'Shaft lights', description: 'The descent shaft is lit.' },
+  { id: 'garden-light', label: 'Garden lamps', description: 'The orbital garden’s grow-lamps are at full brightness.' },
+  { id: 'ring-spin', label: 'Garden ring', description: 'The greenhouse ring turns again.' },
+  { id: 'radio', label: 'Radio mast', description: 'Clear radio on every band.' },
+  { id: 'vault-log', label: 'Vault signal log', description: 'Every signal the station has heard.' },
+  { id: 'telescope', label: 'Telescope', description: 'A view of the whole valley.', beam: '#ff4fd8' },
 ];
 
 export function nextOutline() {

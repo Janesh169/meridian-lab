@@ -357,3 +357,61 @@ describe('oscillations', () => {
     expect(stringHarmonic(2, 0.5, 100, 0.01)).toBeCloseTo((2 * 100) / (2 * 0.5), 9);
   });
 });
+
+import { collide2D, conicalAngle, Governor, inclineMotion, muToRoll, rollAccel, SHAPE_K } from '../../../src/physics/rotation';
+
+describe('rotation and 2D collisions', () => {
+  it('rolling speed at the bottom matches energy conservation v² = 2gh/(1+k)', () => {
+    const th = 25 * DEG, L = 3, h = L * Math.sin(th);
+    for (const k of Object.values(SHAPE_K)) {
+      const a = rollAccel(th, k);
+      const v = Math.sqrt(2 * a * L);
+      expect(rel(v * v, (2 * G_EARTH * h) / (1 + k))).toBeLessThan(1e-12);
+    }
+    // A solid sphere beats a disc, which beats a hollow sphere, which beats a ring.
+    expect(rollAccel(th, SHAPE_K.solidSphere)).toBeGreaterThan(rollAccel(th, SHAPE_K.disc));
+    expect(rollAccel(th, SHAPE_K.hollowSphere)).toBeGreaterThan(rollAccel(th, SHAPE_K.ring));
+  });
+
+  it('skids when static friction is below k·tanθ/(1+k)', () => {
+    const th = 50 * DEG;
+    const need = muToRoll(th, SHAPE_K.ring);
+    expect(inclineMotion(th, SHAPE_K.ring, need * 1.01, 0.2).rolls).toBe(true);
+    const sk = inclineMotion(th, SHAPE_K.ring, need * 0.99, 0.2);
+    expect(sk.rolls).toBe(false);
+    expect(sk.a).toBeCloseTo(G_EARTH * (Math.sin(th) - 0.2 * Math.cos(th)), 12);
+  });
+
+  it('2D collision conserves momentum; equal elastic masses fly off at 90°', () => {
+    const a = { x: 0, y: 0, vx: 2, vy: 0, m: 1, r: 0.05 };
+    const b = { x: 0.1 * Math.cos(0.5), y: 0.1 * Math.sin(0.5), vx: 0, vy: 0, m: 1, r: 0.05 };
+    collide2D(a, b, 1);
+    expect(a.vx + b.vx).toBeCloseTo(2, 12);
+    expect(a.vy + b.vy).toBeCloseTo(0, 12);
+    expect(a.vx * b.vx + a.vy * b.vy).toBeCloseTo(0, 12);
+    expect(a.vx ** 2 + a.vy ** 2 + b.vx ** 2 + b.vy ** 2).toBeCloseTo(4, 12);
+    // Target moves along the line of centres.
+    expect(Math.atan2(b.vy, b.vx)).toBeCloseTo(0.5, 12);
+  });
+
+  it('inelastic 2D collision: normal relative speed scaled by e', () => {
+    const a = { x: 0, y: 0, vx: 3, vy: 1, m: 2, r: 0.05 };
+    const b = { x: 0.1, y: 0, vx: -1, vy: 0, m: 1, r: 0.05 };
+    collide2D(a, b, 0.5);
+    expect(b.vx - a.vx).toBeCloseTo(0.5 * 4, 12);
+    expect(2 * a.vx + b.vx).toBeCloseTo(6 - 1, 12);
+    expect(a.vy).toBe(1);
+  });
+
+  it('flyball governor settles at cosθ = g/(ω²L)', () => {
+    const L = 0.3, w = 9;
+    const g = new Governor(L, w, 2.5, 0.02);
+    for (let i = 0; i < 20000; i++) g.step(1e-3);
+    expect(g.theta).toBeCloseTo(conicalAngle(w, L), 6);
+    expect(Math.cos(conicalAngle(w, L))).toBeCloseTo(G_EARTH / (w * w * L), 12);
+    // Below ω² = g/L the arms hang.
+    const h = new Governor(L, Math.sqrt(G_EARTH / L) * 0.95, 2.5, 0.2);
+    for (let i = 0; i < 20000; i++) h.step(1e-3);
+    expect(Math.abs(h.theta)).toBeLessThan(1e-3);
+  });
+});

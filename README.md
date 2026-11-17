@@ -5,7 +5,7 @@ A story-driven physics lab adventure for **study breaks**, with a hard study loc
 You study, which earns break time and charges the lab's reactor. You take a break, restoring a half-abandoned research station by solving physics puzzles that are accurately simulated. When the break ends, the game **saves mid-puzzle, sounds an alarm, vibrates and locks itself** until you finish another study block.
 
 - 6 puzzle families: projectiles, laser routing (ray optics), particle steering (E/B fields), circuit repair, mechanisms (Newton's laws, friction, Atwood, collisions, torque), and oscillation sync (SHM, resonance)
-- Chapter 1, “Cold Start”, and Chapter 2, “Reserve Power”: 10 segments, 30 story puzzles, plus 7 side experiments. Outline for Chapters 3–6 in `src/content/chapters/outline.ts`
+- Chapters 1–3 (“Cold Start”, “Reserve Power”, “The Orbital Garden”): 15 segments, 45 story puzzles, plus 7 side experiments. Outline for Chapters 4–6 in `src/content/chapters/outline.ts`
 - Touch only. Ships as **one self-contained `index.html`** that runs offline from `file://`
 - Optional GitHub Pages build with Wake Lock, notifications and Add to Home Screen
 
@@ -50,7 +50,7 @@ The e2e tests run the built file over `file://`, offline, on an emulated touch t
 | `tests/unit/machine.test.ts` | Earning rules and caps, every transition, reload, sleep (large time jumps), backward clock jump (tampering), two tabs sharing one timer, import → LOCKED, update-safe loading of old or partial saves, delayed loosening of rules, streaks |
 | `tests/unit/physics/physics.test.ts` | Range `u²sin2θ/g`, max height, minimum-speed launch, mirror reflection, lens `1/v − 1/u = 1/f`, concave mirror focus, Snell's law and slab shift, critical angle and TIR, prism minimum deviation, `r = mv/qB`, `T = 2πm/qB`, helix pitch, velocity selector `v = E/B`, series/parallel, Kirchhoff, Wheatstone balance, RC charging, incline plus friction, Atwood, collisions with restitution, torque, pendulum (small-angle and exact), spring–mass, driven resonance amplitude, string harmonics |
 | `tests/unit/puzzles.test.ts` | Every puzzle's known solution wins, its starting setting fails, its save round-trips, and some puzzles reward understanding (complementary angles, TIR needs n > √2, and so on) |
-| `tests/e2e/run.cjs` | Loads offline with no errors, no game while studying (even after a reload), lock within 1 s of the deadline with the puzzle saved, alarm with no extra tap, sleep, clock tampering, two tabs, export → wipe → import, **a full Chapter 1 and 2 playthrough by touch**, portrait layout |
+| `tests/e2e/run.cjs` | Loads offline with no errors, no game while studying (even after a reload), lock within 1 s of the deadline with the puzzle saved, alarm with no extra tap, sleep, clock tampering, two tabs, export → wipe → import, **a full playthrough of Chapters 1–3 by touch**, portrait layout |
 
 ---
 
@@ -163,7 +163,7 @@ All content is data. The engine code doesn't change.
 
 ### A new puzzle
 
-1. Add a `PuzzleDef` to `src/content/puzzles/ch1.ts` (or a new file imported in `src/puzzles/index.ts`). Pick a `type`: `projectile`, `laser`, `particle`, `circuit`, `incline`, `atwood`, `collision`, `torque`, `pendulum`, `spring` or `resonance`. Copy a similar puzzle and edit `params` (all SI units), `initial`, `solution`, `hints`, `estMinutes` and an optional `bonus`.
+1. Add a `PuzzleDef` to `src/content/puzzles/ch1.ts` (or a new file imported in `src/puzzles/index.ts`). Pick a `type`: `projectile`, `laser`, `particle`, `circuit`, `incline`, `atwood`, `collision`, `torque`, `rolling`, `puck`, `governor`, `pendulum`, `spring` or `resonance`. Copy a similar puzzle and edit `params` (all SI units), `initial`, `solution`, `hints`, `estMinutes` and an optional `bonus`.
 2. Add its concept to `src/content/codex.ts` and point the puzzle's `codex` field at it.
 3. Run `npm test`. The puzzle test checks that your `solution` wins, `initial` fails, and every value sits on its slider grid. To explore win ranges, temporarily copy a loop from `tests/unit/puzzles.test.ts`.
 
@@ -208,5 +208,7 @@ The physics is written from scratch, with no game-physics engine:
 - **Optics** is exact ray tracing: true circular mirrors, an ideal thin lens, and Snell's law with TIR.
 - **Charged particles** use the Boris pusher, which conserves energy exactly in a magnetic field.
 - **Circuits** use modified nodal analysis, with backward-Euler stepping for capacitors.
-- **Inclines** use closed-form piecewise kinematics.
+- **Inclines** use closed-form piecewise kinematics; **rolling bodies** use a = g sinθ/(1+k) with a friction check for skidding.
+- **Air-table pucks** use impulse collisions along the line of centres, with restitution.
+- **The flyball governor** solves the arm's equation of motion in the rotating frame (RK4).
 - **The pendulum** is the full nonlinear equation solved with RK4.

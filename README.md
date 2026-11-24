@@ -4,8 +4,8 @@ A story-driven physics lab adventure for **study breaks**, with a hard study loc
 
 You study, which earns break time and charges the lab's reactor. You take a break, restoring a half-abandoned research station by solving physics puzzles that are accurately simulated. When the break ends, the game **saves mid-puzzle, sounds an alarm, vibrates and locks itself** until you finish another study block.
 
-- 6 puzzle families: projectiles, laser routing (ray optics), particle steering (E/B fields), circuit repair, mechanisms (Newton's laws, friction, Atwood, collisions, torque), and oscillation sync (SHM, resonance)
-- Chapters 1–4 (“Cold Start”, “Reserve Power”, “The Orbital Garden”, “Fields”): 20 segments, 60 story puzzles, plus 7 side experiments. Outline for Chapters 5–6 in `src/content/chapters/outline.ts`
+- 6 puzzle families across 20 puzzle types: projectiles, laser routing and wave optics (ray optics, Young's double slit), particle steering (E/B fields, cyclotron, Penning trap), circuit repair, mechanisms (Newton's laws, friction, Atwood, collisions, rotation, circular motion), and oscillations and waves (SHM, resonance, coupled pendulums, standing waves, Doppler)
+- The complete story, six chapters (“Cold Start”, “Reserve Power”, “The Orbital Garden”, “Fields”, “Standing Waves”, “Lantern”): 30 segments, 90 story puzzles, plus 7 side experiments. After the ending, an experiment archive lets you replay any puzzle for stars. The original chapter outline is kept in `src/content/chapters/outline.ts` as design notes.
 - Touch only. Ships as **one self-contained `index.html`** that runs offline from `file://`
 - Optional GitHub Pages build with Wake Lock, notifications and Add to Home Screen
 
@@ -48,9 +48,9 @@ The e2e tests run the built file over `file://`, offline, on an emulated touch t
 | Suite | What it checks |
 |---|---|
 | `tests/unit/machine.test.ts` | Earning rules and caps, every transition, reload, sleep (large time jumps), backward clock jump (tampering), two tabs sharing one timer, import → LOCKED, update-safe loading of old or partial saves, delayed loosening of rules, streaks |
-| `tests/unit/physics/physics.test.ts` | Range `u²sin2θ/g`, max height, minimum-speed launch, mirror reflection, lens `1/v − 1/u = 1/f`, concave mirror focus, Snell's law and slab shift, critical angle and TIR, prism minimum deviation, `r = mv/qB`, `T = 2πm/qB`, helix pitch, velocity selector `v = E/B`, E×B drift `v = E/B` with cycloid height `2mE/qB²`, magnetic focusing after one pitch, cyclotron extraction energy `q²B²R²/2m`, rolling `a = g sinθ/(1+k)` and the skid condition, 2D collisions, the flyball governor `cosθ = g/ω²L`, series/parallel, Kirchhoff, Wheatstone balance, RC charging, incline plus friction, Atwood, collisions with restitution, torque, pendulum (small-angle and exact), spring–mass, driven resonance amplitude, string harmonics |
+| `tests/unit/physics/physics.test.ts` | Range `u²sin2θ/g`, max height, minimum-speed launch, mirror reflection, lens `1/v − 1/u = 1/f`, concave mirror focus, Snell's law and slab shift, critical angle and TIR, prism minimum deviation, `r = mv/qB`, `T = 2πm/qB`, helix pitch, velocity selector `v = E/B`, E×B drift `v = E/B` with cycloid height `2mE/qB²`, magnetic focusing after one pitch, cyclotron extraction energy `q²B²R²/2m`, rolling `a = g sinθ/(1+k)` and the skid condition, 2D collisions, the flyball governor `cosθ = g/ω²L`, string harmonics `fₙ = n√(T/μ)/2L` from a real wave-equation simulation (including damper nodes), coupled-pendulum transfer time `π/(ω₂ − ω₁)`, Doppler shifts, double-slit fringe width `λD/d` and sheet shift `(n−1)tD/d`, Penning-trap axial frequency `√(qV/md²)` and the stability limit `B > √(2mV/qd²)`, series/parallel, Kirchhoff, Wheatstone balance, RC charging, incline plus friction, Atwood, collisions with restitution, torque, pendulum (small-angle and exact), spring–mass, driven resonance amplitude, string harmonics |
 | `tests/unit/puzzles.test.ts` | Every puzzle's known solution wins, its starting setting fails, its save round-trips, and some puzzles reward understanding (complementary angles, TIR needs n > √2, and so on) |
-| `tests/e2e/run.cjs` | Loads offline with no errors, no game while studying (even after a reload), lock within 1 s of the deadline with the puzzle saved, alarm with no extra tap, sleep, clock tampering, two tabs, export → wipe → import, **a full playthrough of Chapters 1–4 by touch**, portrait layout |
+| `tests/e2e/run.cjs` | Loads offline with no errors, no game while studying (even after a reload), lock within 1 s of the deadline with the puzzle saved, alarm with no extra tap, sleep, clock tampering, two tabs, export → wipe → import, **a full playthrough of all six chapters by touch, then the ending and the archive**, portrait layout |
 
 ---
 
@@ -163,7 +163,7 @@ All content is data. The engine code doesn't change.
 
 ### A new puzzle
 
-1. Add a `PuzzleDef` to `src/content/puzzles/ch1.ts` (or a new file imported in `src/puzzles/index.ts`). Pick a `type`: `projectile`, `laser`, `particle`, `circuit`, `incline`, `atwood`, `collision`, `torque`, `rolling`, `puck`, `governor`, `cyclotron`, `pendulum`, `spring` or `resonance`. Copy a similar puzzle and edit `params` (all SI units), `initial`, `solution`, `hints`, `estMinutes` and an optional `bonus`.
+1. Add a `PuzzleDef` to `src/content/puzzles/ch1.ts` (or a new file imported in `src/puzzles/index.ts`). Pick a `type`: `projectile`, `laser`, `particle`, `circuit`, `incline`, `atwood`, `collision`, `torque`, `rolling`, `puck`, `governor`, `cyclotron`, `penning`, `pendulum`, `spring`, `resonance`, `coupled`, `string`, `doppler` or `ydse`. Copy a similar puzzle and edit `params` (all SI units), `initial`, `solution`, `hints`, `estMinutes` and an optional `bonus`.
 2. Add its concept to `src/content/codex.ts` and point the puzzle's `codex` field at it.
 3. Run `npm test`. The puzzle test checks that your `solution` wins, `initial` fails, and every value sits on its slider grid. To explore win ranges, temporarily copy a loop from `tests/unit/puzzles.test.ts`.
 
@@ -191,7 +191,7 @@ src/
   core/                  pure logic: state machine, save schema and migrations, store and tab sync, stats, save codes
   app/                   browser glue: lifecycle (ticks, lock sequence, wake lock), platform detection, screens
   audio/engine.ts        synthesised sound: SFX, ambience, alarm (no audio files)
-  physics/               simulators: projectile, optics, em, circuits, mechanics, oscillations
+  physics/               simulators: projectile, optics, em (incl. Penning trap), circuits, mechanics, rotation, oscillations, waves
   puzzles/               framework and the puzzle types (types/*.ts)
   render/draw.ts         world-space canvas drawing with SI units and glow
   input/                 touch widgets and the gesture-aware puzzle canvas
@@ -212,4 +212,6 @@ The physics is written from scratch, with no game-physics engine:
 - **Inclines** use closed-form piecewise kinematics; **rolling bodies** use a = g sinθ/(1+k) with a friction check for skidding.
 - **Air-table pucks** use impulse collisions along the line of centres, with restitution.
 - **The flyball governor** solves the arm's equation of motion in the rotating frame (RK4).
-- **The pendulum** is the full nonlinear equation solved with RK4.
+- **The pendulum** is the full nonlinear equation solved with RK4; **coupled pendulums** too.
+- **Strings** solve the damped wave equation on a grid (leapfrog), driven at one end; felt dampers add local damping, so only harmonics with a node there survive.
+- **The Penning trap** uses the Boris pusher with the quadrupole field Φ = (V/2d²)(z² − r²/2) and an axial B, in full 3D.

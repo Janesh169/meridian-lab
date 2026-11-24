@@ -459,3 +459,93 @@ describe('fields: drift, focusing and the cyclotron', () => {
     expect(q.simulateToEnd(120)).toBe('fail');
   });
 });
+
+import { beatFrequency, CoupledPendulums, doppler, fringeWidth, harmonic, sheetShift, StringSim, transferTime, ydseIntensity } from '../../../src/physics/waves';
+import { borisStepEB, penningAxialOmega, penningField, penningMinB } from '../../../src/physics/em';
+
+describe('waves', () => {
+  const base = { L: 1.2, tension: 12.96, mu: 0.01, driveA: 0.002, gamma: 1.5 };
+  it('a driven string resonates at fₙ = n√(T/μ)/2L and shows n loops', () => {
+    for (const n of [1, 2, 3]) {
+      const f = harmonic(n, base.L, base.tension, base.mu);
+      const s = new StringSim({ ...base, driveF: f });
+      s.advance(5);
+      s.resetEnvelope();
+      s.advance(1);
+      expect(s.bestHarmonic().n).toBe(n);
+      expect(s.bestHarmonic().corr).toBeGreaterThan(0.9);
+      expect(s.maxEnvelope()).toBeGreaterThan(10 * base.driveA);
+    }
+  });
+  it('off resonance the string barely moves', () => {
+    const f = 1.5 * harmonic(1, base.L, base.tension, base.mu);
+    const s = new StringSim({ ...base, driveF: f });
+    s.advance(5);
+    s.resetEnvelope();
+    s.advance(1);
+    expect(s.maxEnvelope()).toBeLessThan(5 * base.driveA);
+  });
+  it('a damper at L/3 kills the 2nd harmonic but lets the 3rd ring (it sits on a node)', () => {
+    const ring = (n: number) => {
+      const s = new StringSim({ ...base, driveF: harmonic(n, base.L, base.tension, base.mu), dampers: [{ x: base.L / 3, rate: 400 }] });
+      s.advance(5); s.resetEnvelope(); s.advance(1);
+      return s.maxEnvelope();
+    };
+    expect(ring(3)).toBeGreaterThan(4 * ring(2));
+  });
+  it('coupled pendulums swap all their energy after π/(ω₂ − ω₁)', () => {
+    const L = 1, m = 0.5, k = 0.65;
+    const p = new CoupledPendulums(L, m, k, 4 * DEG);
+    const T = transferTime(L, m, k);
+    const dt = 1e-3;
+    while (p.t < T) p.step(dt);
+    const [e1, e2] = p.energies();
+    expect(e2 / (e1 + e2)).toBeGreaterThan(0.97);
+  });
+  it('Doppler and beats', () => {
+    expect(doppler(440, 340, 12, 0)).toBeCloseTo((440 * 340) / 328, 9);
+    expect(doppler(440, 340, -12, 0)).toBeLessThan(440);
+    expect(doppler(440, 340, 0, 10)).toBeCloseTo((440 * 350) / 340, 9);
+    expect(beatFrequency(456, 458)).toBe(2);
+  });
+  it('Young’s double slit: fringe width λD/d and the sheet shift (n − 1)tD/d', () => {
+    const lam = 650e-9, D = 1.2, d = 0.39e-3;
+    const b = fringeWidth(lam, D, d);
+    expect(ydseIntensity(0, d, D, lam)).toBeCloseTo(1, 12);
+    expect(ydseIntensity(b, d, D, lam)).toBeCloseTo(1, 9);
+    expect(ydseIntensity(b / 2, d, D, lam)).toBeCloseTo(0, 9);
+    const t = 3e-6, n = 1.5;
+    const y0 = sheetShift(n, t, D, d);
+    expect(ydseIntensity(y0, d, D, lam, (n - 1) * t)).toBeCloseTo(1, 9);
+  });
+});
+
+describe('Penning trap', () => {
+  const q = E_CHARGE, m = 40 * 1.66053907e-27, V = 10, d = 0.005;
+  const run = (B: number, T: number) => {
+    const p = { x: 0.001, y: 0, z: 0.001, vx: 0, vy: 0, vz: 0, q, m };
+    const E = { x: 0, y: 0, z: 0 }, Bv = { x: 0, y: 0, z: B };
+    const wc = (q * B) / m, wz = penningAxialOmega(q, m, V, d);
+    const dt = Math.min(2 * Math.PI / wc, 2 * Math.PI / wz) / 200;
+    let rmax = 0, zs: number[] = [], ts: number[] = [];
+    let prevZ = p.z;
+    for (let t = 0; t < T; t += dt) {
+      penningField(p.x, p.y, p.z, V, d, E);
+      borisStepEB(p, E, Bv, dt);
+      rmax = Math.max(rmax, Math.hypot(p.x, p.y));
+      if (prevZ > 0 && p.z <= 0) ts.push(t);
+      prevZ = p.z;
+      if (rmax > 0.05) break;
+    }
+    void zs;
+    return { rmax, axialPeriod: ts.length > 2 ? (ts[ts.length - 1] - ts[0]) / (ts.length - 1) : NaN };
+  };
+  it('axial frequency √(qV/md²); traps above B_min, escapes below', () => {
+    const Bmin = penningMinB(q, m, V, d);
+    const good = run(Bmin * 1.5, 2e-4);
+    expect(good.rmax).toBeLessThan(0.004);
+    expect(rel(good.axialPeriod, (2 * Math.PI) / penningAxialOmega(q, m, V, d))).toBeLessThan(1e-3);
+    const bad = run(Bmin * 0.8, 2e-4);
+    expect(bad.rmax).toBeGreaterThan(0.05);
+  });
+});

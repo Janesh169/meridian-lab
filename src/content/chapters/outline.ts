@@ -1,6 +1,8 @@
 /**
- * Story outline for Chapters 2–6. Each becomes a full chapter file in the same
- * format as ch1.ts. Puzzle ideas are listed by type so the difficulty keeps ramping.
+ * The original story outline for Chapters 2–6, kept as design notes. All six
+ * chapters are now built (ch1.ts … ch6.ts); the hub only shows an outline entry
+ * as "coming next" if its chapter doesn't exist yet, so a future Chapter 7 can be
+ * announced by adding it here first.
  */
 import type { ChapterOutline } from '../../story/types';
 

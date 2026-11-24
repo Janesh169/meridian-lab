@@ -7,17 +7,21 @@ import './types/mechanism';
 import './types/oscillation';
 import './types/rotation';
 import './types/cyclotron';
+import './types/waves';
+import './types/penning';
 import { CH1_PUZZLES } from '../content/puzzles/ch1';
 import { CH2_PUZZLES } from '../content/puzzles/ch2';
 import { CH3_PUZZLES } from '../content/puzzles/ch3';
 import { CH4_PUZZLES } from '../content/puzzles/ch4';
+import { CH5_PUZZLES } from '../content/puzzles/ch5';
+import { CH6_PUZZLES } from '../content/puzzles/ch6';
 import { SIDE_EXPERIMENTS } from '../content/puzzles/side';
 import type { PuzzleDef } from './framework';
 
 export { createPuzzle } from './framework';
 
 const all = new Map<string, PuzzleDef>();
-for (const d of [...CH1_PUZZLES, ...CH2_PUZZLES, ...CH3_PUZZLES, ...CH4_PUZZLES]) all.set(d.id, d);
+for (const d of [...CH1_PUZZLES, ...CH2_PUZZLES, ...CH3_PUZZLES, ...CH4_PUZZLES, ...CH5_PUZZLES, ...CH6_PUZZLES]) all.set(d.id, d);
 for (const s of SIDE_EXPERIMENTS) all.set(s.def.id, s.def);
 
 export function puzzleDef(id: string): PuzzleDef | undefined {
@@ -44,4 +48,9 @@ export const FAMILY: Record<string, string> = {
   puck: 'Momentum (2D)',
   governor: 'Circular motion',
   cyclotron: 'E & B fields',
+  string: 'Waves',
+  coupled: 'Coupled oscillations',
+  doppler: 'Sound & Doppler',
+  ydse: 'Wave optics',
+  penning: 'E & B fields',
 };

@@ -100,6 +100,30 @@ class AudioEngine {
   fail(): void { this.tone(300, 0.3, 'triangle', 0.12, 0, 150); }
   chime(): void { this.tone(880, 0.6, 'sine', 0.12); this.tone(1320, 0.6, 'sine', 0.06, 0.12); }
   unlockSfx(): void { [392, 523, 659].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.1, i * 0.12)); }
+  /**
+   * Two sine tones together for `dur` seconds, so the player can hear beats.
+   * Sine waves only, quiet, so it can never be confused with the alarm.
+   */
+  beats(f1: number, f2: number, dur: number): void {
+    const c = this.ctx;
+    if (!c || !this.sfx) return;
+    const t = c.currentTime + 0.02;
+    for (const f of [f1, f2]) {
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.08, t + 0.08);
+      g.gain.setValueAtTime(0.08, t + dur - 0.2);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(this.sfx);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+  }
+
   /** Gentle two-note "warning" (not the alarm). */
   warning(): void { this.tone(740, 0.35, 'sine', 0.16); this.tone(554, 0.5, 'sine', 0.16, 0.3); }
 

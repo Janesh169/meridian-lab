@@ -44,13 +44,18 @@ const _B: V3 = { x: 0, y: 0, z: 0 };
 /** Advance one Boris step of length dt (seconds). Mutates p. */
 export function borisStep(p: Particle, regions: FieldRegion[], dt: number): void {
   fieldAt(regions, p.x, p.y, _E, _B);
+  borisStepEB(p, _E, _B, dt);
+}
+
+/** One Boris step with explicit fields E and B at the particle's position. */
+export function borisStepEB(p: Particle, E: V3, B: V3, dt: number): void {
   const qm = (p.q / p.m) * 0.5 * dt;
   // half electric kick
-  let vx = p.vx + qm * _E.x;
-  let vy = p.vy + qm * _E.y;
-  let vz = p.vz + qm * _E.z;
+  let vx = p.vx + qm * E.x;
+  let vy = p.vy + qm * E.y;
+  let vz = p.vz + qm * E.z;
   // magnetic rotation
-  const tx = qm * _B.x, ty = qm * _B.y, tz = qm * _B.z;
+  const tx = qm * B.x, ty = qm * B.y, tz = qm * B.z;
   const t2 = tx * tx + ty * ty + tz * tz;
   const sx = (2 * tx) / (1 + t2), sy = (2 * ty) / (1 + t2), sz = (2 * tz) / (1 + t2);
   const px = vx + (vy * tz - vz * ty);
@@ -60,11 +65,35 @@ export function borisStep(p: Particle, regions: FieldRegion[], dt: number): void
   vy += pz * sx - px * sz;
   vz += px * sy - py * sx;
   // half electric kick
-  vx += qm * _E.x;
-  vy += qm * _E.y;
-  vz += qm * _E.z;
+  vx += qm * E.x;
+  vy += qm * E.y;
+  vz += qm * E.z;
   p.vx = vx; p.vy = vy; p.vz = vz;
   p.x += vx * dt; p.y += vy * dt; p.z += vz * dt;
+}
+
+/* ------------------------------------------------------------ Penning trap */
+
+/**
+ * Ideal Penning trap: uniform B along z, plus the quadrupole potential
+ * Φ = (V / 2d²)(z² − (x² + y²)/2). The electric field pushes a positive ion back
+ * toward the centre along z but outward radially; the magnetic field holds it in radially.
+ */
+export function penningField(x: number, y: number, z: number, V: number, d: number, outE: V3): void {
+  const k = V / (2 * d * d);
+  outE.x = k * x;
+  outE.y = k * y;
+  outE.z = -2 * k * z;
+}
+
+/** Axial frequency ω_z = √(qV / (m d²)). */
+export function penningAxialOmega(q: number, m: number, V: number, d: number): number {
+  return Math.sqrt((Math.abs(q) * V) / (m * d * d));
+}
+
+/** Smallest field that traps radially: ω_c² > 2ω_z², i.e. B > √(2mV / (q d²)). */
+export function penningMinB(q: number, m: number, V: number, d: number): number {
+  return Math.sqrt((2 * m * V) / (Math.abs(q) * d * d));
 }
 
 /** Radius of the circular path: r = m v⊥ / |q| B. */

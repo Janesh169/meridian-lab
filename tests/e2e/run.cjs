@@ -18,6 +18,7 @@ const MIN = 60_000;
 let failures = 0;
 const results = [];
 async function test(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;
   const browser = await chromium.launch();
   const t = Date.now();
   try {
@@ -65,6 +66,18 @@ async function studyAndTakeBreak(page, minutes) {
   await page.waitForSelector('[data-testid=start-break]');
   await tapAndSettle(page, '[data-testid=start-break]');
   await page.waitForSelector('[data-testid=break-shell]');
+}
+/**
+ * Each Playwright page has its own fake clock, but real tabs share the system clock.
+ * Advance two tabs together in small steps, so neither ever sees the other's save
+ * stamped far in its own future (which the game would rightly treat as tampering).
+ */
+async function advanceBoth(a, b, ms) {
+  for (let t = 0; t < ms; t += 30_000) {
+    const step = Math.min(30_000, ms - t);
+    await a.clock.fastForward(step);
+    await b.clock.fastForward(step);
+  }
 }
 /** Tap through story lines until an experiment card (or the end card) shows. */
 async function storyToExperiment(page) {
@@ -198,8 +211,7 @@ async function storyToExperiment(page) {
     const c = await open(ctx);
     await tapAndSettle(a, '[data-testid=start-study]');
     await settle(c);
-    await a.clock.fastForward(100 * MIN);
-    await c.clock.fastForward(100 * MIN);
+    await advanceBoth(a, c, 100 * MIN);
     await tapAndSettle(a, '[data-testid=finish-study]');
     await settle(c, 600);
     await c.waitForSelector('[data-testid=start-break]', { timeout: 2000 });
@@ -214,8 +226,7 @@ async function storyToExperiment(page) {
     assert(await c.getByRole('heading', { name: 'Open in another tab' }).isVisible(), 'second tab is told the lab is open elsewhere');
     const saved = await a.evaluate(() => JSON.parse(localStorage.getItem('meridianlab.save')));
     assert(saved.sessions.filter((s) => s.kind === 'break').length === 0 && saved.timer.phase === 'ON_BREAK', 'one running break');
-    await a.clock.fastForward(26 * MIN);
-    await c.clock.fastForward(26 * MIN);
+    await advanceBoth(a, c, 26 * MIN);
     await a.waitForSelector('[data-testid=lock-screen]');
     await c.waitForSelector('[data-testid=lock-screen]');
     const after = await a.evaluate(() => JSON.parse(localStorage.getItem('meridianlab.save')));
@@ -247,11 +258,12 @@ async function storyToExperiment(page) {
     assert(saved.energyEarned >= 160, 'stats and energy restored');
   });
 
-  await test('Chapters 1–4 are playable start to finish (touch, test build)', async (b) => {
+  await test('the whole story (Chapters 1–6) is playable start to finish (touch, test build)', async (b) => {
     const ctx = await tablet(b);
     const page = await open(ctx, TEST);
-    // Plenty of study: 6 study blocks give 6 breaks, which is enough energy for every segment.
-    const segs = ['ch1.s1', 'ch1.s2', 'ch1.s3', 'ch1.s4', 'ch1.s5', 'ch2.s1', 'ch2.s2', 'ch2.s3', 'ch2.s4', 'ch2.s5', 'ch3.s1', 'ch3.s2', 'ch3.s3', 'ch3.s4', 'ch3.s5', 'ch4.s1', 'ch4.s2', 'ch4.s3', 'ch4.s4', 'ch4.s5'];
+    // One full study block (160 min) per segment gives plenty of reactor energy for each.
+    const segs = [];
+    for (let c = 1; c <= 6; c++) for (let k = 1; k <= 5; k++) segs.push(`ch${c}.s${k}`);
     let solved = 0;
     for (const seg of segs) {
       if (await page.locator('[data-testid=lock-screen]').count()) {
@@ -288,9 +300,18 @@ async function storyToExperiment(page) {
       await page.waitForSelector('[data-testid=lock-screen]');
     }
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('meridianlab.save')));
-    assert(saved.progress.completedSegments.length === 20, 'all 20 segments complete: ' + saved.progress.completedSegments);
-    assert(solved === 60, 'solved 60 story puzzles, got ' + solved);
-    assert(saved.progress.codex.length >= 40, 'codex entries unlocked');
+    assert(saved.progress.completedSegments.length === 30, 'all 30 segments complete: ' + saved.progress.completedSegments);
+    assert(solved === 90, 'solved 90 story puzzles, got ' + solved);
+    assert(saved.progress.codex.length >= 60, 'codex entries unlocked: ' + saved.progress.codex.length);
+    // After the ending: the hub shows the ending card, and the archive replays any experiment.
+    await tapAndSettle(page, '[data-testid=start-study-block]');
+    await page.clock.fastForward(30 * MIN);
+    await tapAndSettle(page, '[data-testid=finish-study]');
+    await tapAndSettle(page, '[data-testid=start-break]');
+    await page.waitForSelector('[data-testid=the-end]');
+    await tapAndSettle(page, '[data-testid=archive-toggle]');
+    await tapAndSettle(page, '[data-testid="archive-ch6.fin3"]');
+    await page.waitForSelector('[data-testid=puzzle-screen][data-puzzle="ch6.fin3"]');
     assert(page.errors.length === 0, 'errors: ' + page.errors.join('; '));
   });
 

@@ -3,7 +3,7 @@ import { CHAPTERS, nextOutline, UPGRADES } from '../../content/chapters';
 import { codexEntry } from '../../content/codex';
 import { FAMILY, puzzleDef } from '../../puzzles';
 import {
-  availableSideExperiments, energyAvailable, pacingAdvice, segmentState, startSegment, speedFactor, type SegmentState,
+  availableSideExperiments, energyAvailable, nextSegment, pacingAdvice, segmentState, startSegment, speedFactor, type SegmentState,
 } from '../../story/engine';
 import type { Segment } from '../../story/types';
 import { fmtClock, fmtMin, Stars, useController, useNow } from '../common';
@@ -65,6 +65,16 @@ function Hub(props: { c: Controller }) {
   const minutesLeft = c.breakMsLeft() / 60_000;
   const [ask, setAsk] = useState<{ seg: Segment; est: number; side: string | null } | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [openCh, setOpenCh] = useState<Record<string, boolean>>({});
+  const [showArchive, setShowArchive] = useState(false);
+  const nextSeg = nextSegment(s.progress);
+  const currentCh = Math.max(0, nextSeg ? CHAPTERS.findIndex((ch) => ch.segments.some((sg) => sg.id === nextSeg.id)) : CHAPTERS.length - 1);
+  const archive = CHAPTERS.map((ch, ci) => ({
+    ch, ci,
+    ids: ch.segments.flatMap((sg) => sg.nodes.flatMap((n) => (n.t === 'puzzle' ? [n.id] : []))).filter((id) => s.progress.puzzles[id]),
+  })).filter((a) => a.ids.length);
+  const starTotal = archive.reduce((a, x) => a + x.ids.reduce((b, id) => b + (s.progress.puzzles[id]?.stars ?? 0), 0), 0);
+  const starMax = CHAPTERS.reduce((a, ch) => a + ch.segments.reduce((b, sg) => b + sg.nodes.filter((n) => n.t === 'puzzle').length, 0), 0) * 3;
   const energy = energyAvailable(s);
   const sides = availableSideExperiments(s.progress);
   const allDone = CHAPTERS.every((ch) => ch.segments.every((sg) => s.progress.completedSegments.includes(sg.id)));
@@ -83,18 +93,27 @@ function Hub(props: { c: Controller }) {
   return (
     <div class="screen scroll">
       <div class="page col" style={{ gap: 16 }}>
-        {CHAPTERS.map((ch, ci) => (
-          <div class="col" style={{ gap: 10 }}>
-            <div class="row" style={{ justifyContent: 'space-between' }}>
-              <h2>Chapter {ci + 1}: {ch.title}</h2>
-              <span class="pill">Reactor {energy} kJ</span>
+        <div class="row" style={{ justifyContent: 'space-between' }}>
+          <span class="dim">{s.progress.completedSegments.length} of {CHAPTERS.reduce((a, ch) => a + ch.segments.length, 0)} sections restored · {starTotal} of {starMax} ★</span>
+          <span class="pill">Reactor {energy} kJ</span>
+        </div>
+        {CHAPTERS.map((ch, ci) => {
+          const done = ch.segments.every((sg) => s.progress.completedSegments.includes(sg.id));
+          const expanded = openCh[ch.id] ?? ci === currentCh;
+          const status = done ? '✓ Restored' : ci === currentCh ? 'In progress' : ci > currentCh ? 'Locked' : '';
+          return (
+            <div class="col" style={{ gap: 10 }}>
+              <button class="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, textAlign: 'left', color: 'inherit', font: 'inherit', minHeight: 48 }} onClick={() => setOpenCh({ ...openCh, [ch.id]: !expanded })} aria-expanded={expanded}>
+                <h2 style={{ opacity: ci > currentCh ? 0.5 : 1 }}>Chapter {ci + 1}: {ch.title}</h2>
+                <span class={'pill ' + (done ? 'ok' : '')}>{status} {expanded ? '▾' : '▸'}</span>
+              </button>
+              {expanded && ch.segments.map((seg, i) => {
+                const st = segmentState(s, seg);
+                return <SegRow seg={seg} i={i} st={st} onOpen={() => open(seg)} est={seg.estMinutes * f} />;
+              })}
             </div>
-            {ch.segments.map((seg, i) => {
-              const st = segmentState(s, seg);
-              return <SegRow seg={seg} i={i} st={st} onOpen={() => open(seg)} est={seg.estMinutes * f} />;
-            })}
-          </div>
-        ))}
+          );
+        })}
 
         {ask && (
           <div class="card col" style={{ borderColor: 'var(--amber)' }} data-testid="pacing-ask">
@@ -104,6 +123,13 @@ function Hub(props: { c: Controller }) {
               <button class="btn" onClick={() => open(ask.seg)}>Start anyway</button>
               <button class="btn ghost" onClick={() => setAsk(null)}>Cancel</button>
             </div>
+          </div>
+        )}
+
+        {allDone && !nextOutline() && (
+          <div class="card col" style={{ borderColor: 'var(--green)' }} data-testid="the-end">
+            <h3>The Meridian Institute is restored</h3>
+            <p class="dim" style={{ margin: 0 }}>Rao is free, the Lantern is safe, and MOSS has taken up gardening. Replay any experiment from the archive below to earn all three stars ({starTotal} of {starMax} so far), or try the side experiments.</p>
           </div>
         )}
 
@@ -133,6 +159,30 @@ function Hub(props: { c: Controller }) {
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {archive.length > 0 && (
+          <div class="col" style={{ gap: 8 }}>
+            <button class="row" style={{ justifyContent: 'space-between', background: 'none', border: 0, padding: 0, color: 'inherit', font: 'inherit', minHeight: 48 }} onClick={() => setShowArchive(!showArchive)} aria-expanded={showArchive} data-testid="archive-toggle">
+              <h3>Experiment archive</h3>
+              <span class="pill">replay for stars {showArchive ? '▾' : '▸'}</span>
+            </button>
+            {showArchive && archive.map((a) => (
+              <div class="col" style={{ gap: 6 }}>
+                <span class="dim" style={{ fontSize: '0.85em' }}>Chapter {a.ci + 1}: {a.ch.title}</span>
+                <div class="row" style={{ gap: 8 }}>
+                  {a.ids.map((id) => {
+                    const rec = s.progress.puzzles[id]!;
+                    return (
+                      <button class="chip" onClick={() => c.openPuzzle(id, 'side')} data-testid={`archive-${id}`}>
+                        {puzzleDef(id)?.title} {rec.skipped ? <span class="warnc">(skipped)</span> : <Stars n={rec.stars} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

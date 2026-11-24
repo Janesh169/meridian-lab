@@ -34,7 +34,7 @@ export const OUTLINE: ChapterOutline[] = [
     title: 'Standing Waves',
     topics: 'SHM, resonance, waves on strings, sound',
     summary:
-      'The trap’s containment is tuned by resonating strings and cavities. Tomas makes his move from the valley: he has a back door into MOSS’s systems, he called the lift in Chapter 1, and he wants to sell the Lantern’s ion. MOSS has to choose between protocol and trust.',
+      'Tomas arrives by cable car. The trap’s containment is tuned by resonating strings and cavities, and he tries to detune them to force the trap open, while MOSS has to choose between its sealing protocol and opening hatch −4 for Rao.',
     puzzles: ['oscillation: standing-wave node placement on a tensioned wire', 'oscillation: coupled pendulums energy transfer', 'oscillation: driven damped oscillator with damping control', 'oscillation: beats between two tuning forks', 'laser: interference timing via path length'],
   },
   {

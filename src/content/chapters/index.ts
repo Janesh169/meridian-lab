@@ -4,9 +4,10 @@ import type { Chapter, Upgrade } from '../../story/types';
 import { CH1 } from './ch1';
 import { CH2 } from './ch2';
 import { CH3 } from './ch3';
+import { CH4 } from './ch4';
 import { OUTLINE } from './outline';
 
-export const CHAPTERS: Chapter[] = [CH1, CH2, CH3];
+export const CHAPTERS: Chapter[] = [CH1, CH2, CH3, CH4];
 export { OUTLINE };
 
 export const UPGRADES: Upgrade[] = [
@@ -25,6 +26,11 @@ export const UPGRADES: Upgrade[] = [
   { id: 'radio', label: 'Radio mast', description: 'Clear radio on every band.' },
   { id: 'vault-log', label: 'Vault signal log', description: 'Every signal the station has heard.' },
   { id: 'telescope', label: 'Telescope', description: 'A view of the whole valley.', beam: '#ff4fd8' },
+  { id: 'hall-power', label: 'Particle hall', description: 'The trap’s live status is on the hub.' },
+  { id: 'cyclotron', label: 'Cyclotron', description: 'The calibration beam is running.' },
+  { id: 'drift', label: 'Drift channel', description: 'Ions move without the main magnets.' },
+  { id: 'spectrometer', label: 'Spectrometer', description: 'The trap’s contents can be measured.' },
+  { id: 'lantern-core', label: 'Lantern core', description: 'The trap is stable for 90 days.' },
 ];
 
 export function nextOutline() {

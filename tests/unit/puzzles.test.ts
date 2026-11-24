@@ -115,6 +115,6 @@ describe('story content is consistent', () => {
         }
       }
     }
-    expect(CHAPTERS.map((c) => c.id)).toEqual(['ch1', 'ch2', 'ch3']);
+    expect(CHAPTERS.map((c) => c.id)).toEqual(['ch1', 'ch2', 'ch3', 'ch4']);
   });
 });

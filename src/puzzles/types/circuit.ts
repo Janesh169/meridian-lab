@@ -24,7 +24,8 @@ export interface CircuitPart {
   r?: number;
   /** Battery orientation control: value 1 = reversed. */
   flip?: string;
-  farads?: number;
+  /** Capacitance in farads: fixed, or a control (0 = empty socket). */
+  farads?: Num;
   /** Max current before it burns out (A). */
   rating?: number;
   /** Bulbs: current (A) at which it is at full brightness. */
@@ -37,7 +38,9 @@ export type CircuitGoal =
   | { kind: 'current'; part: string; min: number; max: number; label: string }
   | { kind: 'balanced'; part: string; max: number }
   | { kind: 'notCharging'; part: string }
-  | { kind: 'capThreshold'; part: string; volts: number; tMin: number; tMax: number; label: string };
+  | { kind: 'capThreshold'; part: string; volts: number; tMin: number; tMax: number; label: string }
+  /** Voltage across a part must fall in a window. */
+  | { kind: 'voltage'; part: string; min: number; max: number; label: string };
 
 export interface CircuitParams {
   view: View;
@@ -88,9 +91,11 @@ class CircuitPuzzle extends Puzzle<CircuitParams> {
         case 'switch':
           out.push({ kind: 'S', id: p.id, a, b, closed: true });
           break;
-        case 'capacitor':
-          out.push({ kind: 'C', id: p.id, a, b, farads: p.farads ?? 1e-3 });
+        case 'capacitor': {
+          const F = this.num(p.farads ?? 1e-3);
+          if (F > 0) out.push({ kind: 'C', id: p.id, a, b, farads: F });
           break;
+        }
         default: {
           const R = this.num(p.ohms);
           if (R > 0) out.push({ kind: 'R', id: p.id, a, b, ohms: R });
@@ -138,7 +143,9 @@ class CircuitPuzzle extends Puzzle<CircuitParams> {
         this.sol = r.sol;
       }
       const g = P.goals.find((q) => q.kind === 'capThreshold') as Extract<CircuitGoal, { kind: 'capThreshold' }>;
-      const v = Math.abs(this.capV[g.part] ?? 0);
+      const gp = P.parts.find((q) => q.id === g.part)!;
+      // Measure across the part's terminals, so parallel sockets (even an empty one) read the bank voltage.
+      const v = Math.abs(this.sol!.v[P.pins[gp.from].node] - this.sol!.v[P.pins[gp.to].node]);
       if (this.doorAt === null && v >= g.volts) this.doorAt = this.tOn;
       if (this.doorAt !== null) {
         if (this.doorAt < g.tMin) return this.finish(false, `The door opened at ${this.doorAt.toFixed(2)} s, too early (window ${g.tMin}–${g.tMax} s).`);
@@ -162,7 +169,11 @@ class CircuitPuzzle extends Puzzle<CircuitParams> {
     for (const g of P.goals) {
       const part = P.parts.find((p) => p.id === (g as any).part)!;
       const I = sol.current[g.kind === 'capThreshold' ? '' : g.part] ?? 0;
-      if (g.kind === 'current') {
+      if (g.kind === 'voltage') {
+        const V = Math.abs(sol.v[P.pins[part.from].node] - sol.v[P.pins[part.to].node]);
+        if (V < g.min) return this.finish(false, `${g.label}: ${V.toFixed(2)} V is too low (needs ${g.min}–${g.max} V).`);
+        if (V > g.max) return this.finish(false, `${g.label}: ${V.toFixed(2)} V is too high (needs ${g.min}–${g.max} V).`);
+      } else if (g.kind === 'current') {
         const a = Math.abs(I);
         if (a < g.min) return this.finish(false, `${g.label}: ${amp(a)} is too low (needs ${ampRange(g.min, g.max)}).`);
         if (a > g.max) return this.finish(false, `${g.label}: ${amp(a)} is too high (needs ${ampRange(g.min, g.max)}).`);
@@ -215,7 +226,7 @@ class CircuitPuzzle extends Puzzle<CircuitParams> {
     // Goals panel (top-left)
     let y = P.view.y + P.view.h - 0.1;
     for (const g of P.goals) {
-      const label = g.kind === 'current' ? `${g.label}: ${ampRange(g.min, g.max)}` : g.kind === 'balanced' ? `${P.parts.find((q) => q.id === g.part)!.label}: zero deflection` : g.kind === 'notCharging' ? `${P.parts.find((q) => q.id === g.part)!.label}: must not be charged backwards` : `${g.label}: open between ${g.tMin}–${g.tMax} s`;
+      const label = g.kind === 'voltage' ? `${g.label}: ${g.min}–${g.max} V` : g.kind === 'current' ? `${g.label}: ${ampRange(g.min, g.max)}` : g.kind === 'balanced' ? `${P.parts.find((q) => q.id === g.part)!.label}: zero deflection` : g.kind === 'notCharging' ? `${P.parts.find((q) => q.id === g.part)!.label}: must not be charged backwards` : `${g.label}: open between ${g.tMin}–${g.tMax} s`;
       d.text(P.view.x + 0.1, y, '◇ ' + label, 13, C.dim, 'left', 'top');
       y -= 26 / d.cam.scale;
     }
@@ -336,10 +347,19 @@ function drawPart(d: Draw, pz: CircuitPuzzle, p: CircuitPart, a: { x: number; y:
       break;
     }
     case 'capacitor': {
+      const F = pz.num(p.farads ?? 1e-3);
+      if (F <= 0) {
+        d.line(a.x, a.y, mx - ux * s, my - uy * s, 'rgba(127,149,171,0.8)', 2.5);
+        d.line(mx + ux * s, my + uy * s, b.x, b.y, 'rgba(127,149,171,0.8)', 2.5);
+        d.ring(mx - ux * s, my - uy * s, 5, C.dim, 2);
+        d.ring(mx + ux * s, my + uy * s, 5, C.dim, 2);
+        label(`${p.label}: empty`, C.dim);
+        break;
+      }
       lead();
       d.line(mx - ux * 0.07 - nx * 0.3, my - uy * 0.07 - ny * 0.3, mx - ux * 0.07 + nx * 0.3, my - uy * 0.07 + ny * 0.3, '#c9d6e3', 4);
       d.line(mx + ux * 0.07 - nx * 0.3, my + uy * 0.07 - ny * 0.3, mx + ux * 0.07 + nx * 0.3, my + uy * 0.07 + ny * 0.3, '#c9d6e3', 4);
-      label(`${p.label} ${(p.farads! * 1e6).toFixed(0)} µF`);
+      label(`${p.label} ${(F * 1e6).toFixed(0)} µF`);
       const v = sol ? (sol.v[pz.params.pins[p.from].node] - sol.v[pz.params.pins[p.to].node]) : 0;
       side(-1, `${Math.abs(v).toFixed(2)} V`, C.cyan);
       break;

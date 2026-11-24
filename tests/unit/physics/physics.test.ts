@@ -415,3 +415,47 @@ describe('rotation and 2D collisions', () => {
     expect(Math.abs(h.theta)).toBeLessThan(1e-3);
   });
 });
+
+describe('fields: drift, focusing and the cyclotron', () => {
+  const mp = 1.00728 * 1.66053907e-27;
+  it('E×B drift: average speed E/B for any charge or mass; cycloid height 2mE/(qB²)', () => {
+    const B = 0.01, E = 200;
+    for (const [q, m] of [[E_CHARGE, mp], [-E_CHARGE, mp], [2 * E_CHARGE, 4 * mp]]) {
+      const p = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, q, m };
+      const T = cyclotronPeriod(m, q, B);
+      const field = [{ x: -10, y: -10, w: 20, h: 20, E: { x: 0, y: E, z: 0 }, B: { x: 0, y: 0, z: B } }];
+      let ymax = 0, ymin = 0;
+      const n = 4000;
+      for (let i = 0; i < n; i++) { borisStep(p, field, T / n); ymax = Math.max(ymax, p.y); ymin = Math.min(ymin, p.y); }
+      // After exactly one period the charge is back at rest, displaced by v_d·T along x.
+      expect(rel(p.x, (E / B) * T)).toBeLessThan(1e-4);
+      const hop = (2 * m * E) / (Math.abs(q) * B * B);
+      expect(rel(Math.max(ymax, -ymin), hop)).toBeLessThan(1e-3);
+    }
+  });
+
+  it('magnetic focusing: a tilted proton returns to the axis after one pitch', () => {
+    const B = 0.06, v = 6e5, a = 8 * DEG;
+    const p = { x: 0, y: 0, z: 0, vx: v * Math.cos(a), vy: v * Math.sin(a), vz: 0, q: E_CHARGE, m: mp };
+    const T = cyclotronPeriod(mp, E_CHARGE, B);
+    const field = [{ x: -10, y: -10, w: 20, h: 20, E: { x: 0, y: 0, z: 0 }, B: { x: B, y: 0, z: 0 } }];
+    for (let i = 0; i < 4000; i++) borisStep(p, field, T / 4000);
+    expect(Math.hypot(p.y, p.z)).toBeLessThan(1e-6);
+    expect(rel(p.x, helixPitch(mp, v * Math.cos(a), E_CHARGE, B))).toBeLessThan(1e-9);
+  });
+
+  it('cyclotron: in step, the ion is extracted with KE ≈ q²B²R²/2m; 5% off-frequency it never gets there', async () => {
+    const { allPuzzleDefs, createPuzzle } = await import('../../../src/puzzles');
+    const def = allPuzzleDefs().find((d) => d.id === 'ch4.cyc1')!;
+    const p = createPuzzle(def) as any;
+    p.values.f = 7.62;
+    expect(p.simulateToEnd(120)).toBe('win');
+    const design = (E_CHARGE * 0.5 * 0.12) ** 2 / (2 * mp) / E_CHARGE / 1000;
+    // Real cyclotron orbits are not centred exactly on the origin, so the gyroradius
+    // at the moment r crosses the extraction radius differs by a few per cent.
+    expect(rel(p.keV(), design)).toBeLessThan(0.15);
+    const q = createPuzzle(def) as any;
+    q.values.f = 7.62 * 1.05;
+    expect(q.simulateToEnd(120)).toBe('fail');
+  });
+});
